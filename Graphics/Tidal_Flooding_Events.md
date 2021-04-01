@@ -66,7 +66,7 @@ theme_set(theme_cbep())
 # Import Data
 
 Our primary source data is hourly data on observed and predicted water
-levels at the Providence tide station (Station 8418150). We accessed
+levels at the Providence tide station (Station 8454000). We accessed
 these data using small python scripts to download and assemble
 consistent data from the NOAA Tides and Currents API. Details are
 provided in the “Original Data” folder.
@@ -228,15 +228,15 @@ annot_data <- obs_annual %>%
   mutate(annot = paste("+/-", 
                        round(365 * predict,1),
                        'Days\nper Year'),
-         height = c(0.02, 0.0025)) %>%
+         height = c(0.02, 0.003)) %>%
   
   select(Year, height, annot)
 annot_data
 #> # A tibble: 2 x 3
 #>    Year height annot                   
 #>   <dbl>  <dbl> <chr>                   
-#> 1  1945 0.02   "+/- 1.4 Days\nper Year"
-#> 2  2015 0.0025 "+/- 8.4 Days\nper Year"
+#> 1  1945  0.02  "+/- 1.4 Days\nper Year"
+#> 2  2015  0.003 "+/- 8.4 Days\nper Year"
 ```
 
 ``` r

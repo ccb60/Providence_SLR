@@ -58,7 +58,7 @@ load_cbep_fonts()
 
 Our primary source data is based on NOAA’s analysis of sea level trends.
 The description on the source web site
-(<https://tidesandcurrents.noaa.gov/datums.html?id=8418150>) says the
+(<https://tidesandcurrents.noaa.gov/datums.html?id=8454000>) says the
 following, so this is apparently NOT raw data.
 
 > “The plot shows the monthly mean sea level without the regular
@@ -71,18 +71,6 @@ For convenience, we want to be able to report these elevations as
 positive values, which makes it easier for readers to compare
 elevations. NOAA uses a datum of MLLW for charting purposes. We follow
 that practice here.
-
-According to <https://tidesandcurrents.noaa.gov/datums.html?id=8418150>,
-at Providence, MLLW has an elevation (in feet) of 0.0 , while MSL has an
-elevation of 4.94. We can convert elevations in inches MSL to elevations
-in inches MLLW) as follows:
-
-$$
-E\_{MLLW} = E\_{MSL} + (4.94 ft\\times \\frac{12 in}{1 ft})
-$$
-An alternative is to declare some other arbitrary sea level datum as a
-“Relative Sea Level.” We prepare a graphic that way, below, but chose
-not to use it.
 
 ``` r
 sibfldnm <- 'Original_Data'

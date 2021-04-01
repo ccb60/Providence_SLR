@@ -63,7 +63,7 @@ library(data.table)  # for fread to read large files
 
 library(moments)  # for skewness and kurtosis; we could calculate, but why?
 library(forecast) # for auto.arima()
-library(lubridate)
+library(lubridate)  # For date time imports
 
 library(CBEPgraphics)
 load_cbep_fonts()
@@ -72,7 +72,7 @@ theme_set(theme_cbep())
 
 # Import Data
 Our primary source data is hourly data on observed and predicted water levels at
-the Providence tide station (Station 8418150).  We accessed these data using small
+the Providence tide station (Station 8454000).  We accessed these data using small
 python scripts to download and assemble consistent data from the NOAA Tides and
 Currents API.  Details are provided in the "Original_Data" folder.
 

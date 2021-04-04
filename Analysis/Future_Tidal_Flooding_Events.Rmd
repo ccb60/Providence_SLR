@@ -218,7 +218,7 @@ mock_epoch <- combined %>%
   filter(Year> 2002 & Year < 2021)
 ```
 
-# How Many Flood Events per Year?
+# How Many Flood Events Have Happened per Year?
 ## Function for Counting Days with Flooding
 ```{r flood_count_fxn}
 flood_counts <- function(dat, dts, observed_wl, flood = FLOOD_ELEVATION) {
@@ -266,7 +266,7 @@ days, or about three and a third floods a year. More recently, we've seen
 the rate of flooding more than double, even though sea level only rose a few 
 inches over that period of time.  That's remarkable.
 
-## Alternate Method
+## Function for Mean and SD of Days of Flooding Per Year
 Using slightly different methods, we get a slightly different numbers (+/-
 2%), but more importantly, we can calculate variability in mean number of 
 flood events each year.  The disadvantage is that it is not obvious whether we 
@@ -308,8 +308,7 @@ results <- df %>%
               if_else(Year %% 4 == 0 & (! Year %% 100 == 0), 365, 366),
             .groups = 'drop') %>%
   select(-floods_p_d) %>%
-  summarize(across(contains('floods'), c(mean, sd), na.rm = TRUE)) %>%
-  rename_with( ~ sub('1', 'mean', sub('2', 'sd', .x)))
+  summarize(across(contains('floods'), c(mean = mean, sd = sd), na.rm = TRUE)) 
 
   return(results)
 }
@@ -395,7 +394,7 @@ adequate.
 There is no evidence in the historic data that there are correlations between
 deviations and the predicted tide.
 
-# Reprise the MGS Analysis
+# Estimates of Future Flood Frequency Using the MGS Analysis
 The simplest way to evaluate future flooding risk is simply to take the existing 
 tidal record and raise all elevations by a fixed amount, and count up how many 
 flood events that suggests you might see in the future.  
@@ -419,7 +418,7 @@ out in a spreadsheet program.  In R, we use the Tidyverse to do the necessary
 math.  We build a simple function to return expected number of future flood
 events under SLR.
 
-# Function for SLR Scenarios
+## Function for SLR Scenarios
 This function counts the number of days with flood events that would have
 occurred over a period of years under various sea level rise scenarios. It uses 
 the result to estimate annual mean and standard deviation of rate of flooding. 
@@ -429,7 +428,7 @@ years, with more or less complete records from each year. (The original use case
 was based on a 19 year period associated with the  tidal epoch).
 
 ```{r mgs_analysis}
-f_flood_counts <- function(dat, dts, observed_wl, slr = 0, flood = FLOOD_ELEVATION) {
+f_flood_means <- function(dat, dts, observed_wl, slr = 0, flood = FLOOD_ELEVATION) {
   # dat is a dataframe
   # dts is a data column in that data frame of dates
   # observed_wl is a data column of hourly observed water levels at
@@ -445,54 +444,67 @@ f_flood_counts <- function(dat, dts, observed_wl, slr = 0, flood = FLOOD_ELEVATI
   
   #create a dataframe
   df <- tibble(theDate = dat[[dts]], obs_wl = dat[[obs_wl]]) %>%
-    mutate(Year = as.numeric(format(theDate, format = '%Y')),
-           exceeds_0 = obs_wl > flood)
+    mutate(Year = as.numeric(format(theDate, format = '%Y')))
 
-  if(! ((length(slr) == 1 & slr[[1]] == 0)   | 
-       (length(slr) == 1  & is.na(slr[[1]])) |
-        length(slr) == 0)) {
-  # then we have at least one value to add to the null SLR case
-  # Is there a way to do this inside the tidyverse?
+  if (missing(slr) || (length(slr) == 1  && is.na(slr[[1]]))) {
+    # Without slr scenarios, we fill in with the null SLR case
+    df <- df %>%
+      mutate(slr_0 = obs_wl > flood)
+  }
+  else {
+    # we work through each slr scenario and calculate related data
     for (n in seq_along(slr)) {
-      if(slr[[n]] != 0) {               # don't add a pointless no SLR column
         df[[paste0('slr_', n)]] <-  df$obs_wl + slr[[n]]
         df[[paste0('exceeds_', n)]] <- df[[paste0('slr_', n)]] > flood
-      }
     }
   }
   
-  # Now we run through the calculation steps.
-   result <- df %>%
-     # Group by day
-     group_by(theDate) %>%
-     select(-contains('slr')) %>%
-     summarize(Year = first(Year),
-               across(contains('exceeds'), any, na.rm = TRUE),
-               .groups = 'drop') %>%
-     group_by(Year) %>%
-     summarize(Year = first(Year),
-               days = n(),
-               across(contains('exceeds'), sum),
-               .groups = 'drop') %>%
-     rename_with( ~ sub('exceeds', 'floods', .x)) %>%
-     mutate(across(contains('floods'), ~.x * 365.25 / days, 
-                   .names = "{.col}_p_yr")) %>%
-     summarize(across(contains('floods'), c(mean = mean, sd = sd), na.rm = TRUE,
-                      .names = "{.col}_{.fn}"))
-   
-  result <- unname(unlist(result)) 
+  # Now we run through the remaining calculation steps.
+  result <- df %>%
+    select(-contains('slr')) %>%
+    # Group by day
+    group_by(theDate) %>%
+    # Determine if a flood event occurs that day
+    summarize(Year = first(Year),
+              across(contains('exceeds'), any, na.rm = TRUE),
+              .groups = 'drop') %>%
     
+    # Group by Year
+    group_by(Year) %>%
+    # Add up the number of days with at least one hour of flooding
+    summarize(Year = first(Year),
+              days = n(),
+              across(contains('exceeds'), sum),
+              .groups = 'drop') %>%
+    rename_with( ~ sub('exceeds', 'floods', .x)) %>%
+    # Calculate a value rescaled by the number of days of data
+    mutate(across(contains('floods'), ~.x * 365.25 / days, 
+                  .names = "{.col}_p_yr")) %>%
+    
+    # Finally, calculate mean and standard deviations of yearly totals.
+    summarize(across(contains('floods'), c(mean = mean, sd = sd), na.rm = TRUE,
+                     .names = "{.col}_{.fn}"))
+
+  # We calculated everything in a tibble, but we want to output
+  # an array.  We first make a vector.
+  result <- unname(unlist(result)) 
+  
+  # That means we need to create row and column labels
   num_scenarios <-  length(result) / 4
   collabs <- c('Mean', 'SD')
   rowlabs <- c(paste0('floods_', 0:(num_scenarios - 1)), 
                paste0('floods_p_yr', 0:(num_scenarios - 1)))
   
+  # Then we reshape the vector by specifying its dimensions
   dim(result) <- c(2, length(result)/ 2)
+  # And transpose it, so we end up with two columns, not two rows.
   result = t(result)
+  
+  ## Apply the names
   rownames(result) <- rowlabs
   colnames(result) <- collabs
-
-  # add an attribute that retains the SLR values used.
+  
+  # Add an attribute to retains the SLR values used.
   attr(result, 'slr') <- slr
   return(result)
 }
@@ -504,7 +516,7 @@ We generate future frequency of flooding events estimates for one foot, two
 foot and three foot SLR scenarios, based on the tidal epoch.  
 (The decimals are those SLR values in meters).
 ```{r mgs_means}
-mgs_est <- f_flood_counts(epoch, theDate, MLLW, c(0.3048, 0.6096, 0.9144))
+mgs_est <- f_flood_means(epoch, theDate, MLLW, c(0, 0.3048, 0.6096, 0.9144))
 mgs_est
 ```
 
@@ -534,7 +546,7 @@ The function as drafted automatically reports the flooding frequency during
 the tidal epoch as the first value, so we add four more "scenarios".
 
 ```{r mgs_means_recent}
-mgs_est_modern <- f_flood_counts(epoch, theDate, MLLW,
+mgs_est_modern <- f_flood_means(epoch, theDate, MLLW,
                                  c(0.075, 0.3048 + 0.075, 0.6096 + 0.075, 0.9144 + 0.075))
 mgs_est_modern
 ```
@@ -553,7 +565,6 @@ on current sea levels.  That ratio is slightly lower than we saw looking at
 changes in flood frequency building from the low base of the tidal epoch. 
 That is likely because the number of flood events during the tidal epoch was 
 so low.
-
 
 # Simulation Models
 ## Model Structure
@@ -836,7 +847,7 @@ sim_once <- function(dat, pr_sl, dts, slr, flood = FLOOD_ELEVATION,
 
 ```
 
-### Test The Function
+## Test The Function
 ```{r test_sim_once}
 sim_once(epoch, Prediction, theDate, 0, flood = FLOOD_ELEVATION)
 ```
@@ -844,7 +855,7 @@ That value is a random value that will vary each time the function is run.
 In general, it is fairly close to the observed frequency of flooding over the 
 official tidal epoch (about 3.37).
 
-### Run Full Simulation, No SLR
+## Run 1000 Simulations, Without SLR
 The following takes a couple of minutes to run. It runs the simulation function 
 a thousand times and sticks the results into a vector (res).
 ```{r demo_sim_once}
@@ -856,7 +867,7 @@ for (iter in seq(1, samp)) {
 }
 ```
 
-#### Evaluate Results
+### Look at Simulation Results
 ```{r sim_once_demo_hist, fig.width = 4}
 ggplot() +
   geom_histogram(aes(x = res, y = ..density..), bins = 50) +
@@ -882,28 +893,25 @@ events over a 19 year period based on 100 simulations.  It is not a measure of
 interannual variation in the number of flood events. (This analysis does not
 provide an estimate of that figure.)
 
-# Wrapping it all up
+# Wrapping It All Up
 How much will SLR increase the frequency of days with flooding? We focus on the
 period of the tidal epoch, when difference between observed and predicted tides
 were minimized. That makes these results only qualitatively related to change in
 frequency of flooding compared to recent times.
 
 ### Direct Substitution
-We ran these calculations previously using the MGS approach. 
+We ran these calculations previously using the MGS approach. We run the
+code based on the tidal epoch, updated for about 30 years of average sea level 
+rise, and for four scenarios, zero, one foot, two foot, and three foot of SLR.
 ```{r reprise_mgs_predictions}
 hist_slr <- 0.075
-mgs_est_modern <- f_flood_counts(epoch, theDate, MLLW,
+mgs_est_modern <- f_flood_means(epoch, theDate, MLLW,
                                  c(hist_slr, 
                                    0.3048 + hist_slr, 
                                    0.6096 + hist_slr, 
                                    0.9144 + hist_slr))
 mgs_est_modern
-```
-(Note here the SD is an interannual SD).
 
-We can calculate an expected ratio of increased flooding events, and build a
-useful vector for later use.
-```{r build_vector_of_mgs_results}
 `One Foot Multiplier` <- round(mgs_est_modern[3,1] / mgs_est_modern[2,1],2)
 `Two Foot Multiplier` <- round(mgs_est_modern[4,1] / mgs_est_modern[2,1],2)
 `Three Foot Multiplier` <- round(mgs_est_modern[5,1] / mgs_est_modern[2,1],2)
@@ -919,10 +927,11 @@ rm(`One Foot Multiplier`,
    `Two Foot Multiplier`,
    `Three Foot Multiplier`)
 ```
+(Note here the SD is an interannual SD, not a standard error from a simulation).
 
 ## ARIMA
-We create a wrapper function to automate running our simulation repeatedly for
-each sea level scenario.  As we did for the 
+We create a wrapper function to automate running the ARIMA simulation repeatedly 
+for each sea level scenario.
 
 The function `sim_auto()` is not fully encapsulated, as it requires the data
 frame passed as the `df` parameter to contain a data column named "Prediction" 
@@ -934,17 +943,16 @@ sim_auto <- function(df, slr, samp) {
     res[[iter]] <- sim_once(df, Prediction, theDate, slr)
   return(res)
 }
-  
 ```
 
-
-We run this simulation for the same sea level rise scenarios we just used.  The
-code here uses `lapply()` to apply a function over a list, and return a list, 
-here a list of vectors containing results of separate simulation runs.
+We run this simulation for the same sea level rise scenarios.  The
+code here uses `lapply()` to apply a function over a list, and return a list.
+Here the function returns a list of vectors containing results of separate 
+simulation runs.
 
 The following takes several minutes to run.
 ```{r simulations, cache=TRUE}
-set.seed(12345)
+# set.seed(12345)
 samp = 1000
 simulates <- lapply(((0:3 * 0.3048) + 0.075), 
                     function(x) sim_auto(epoch, x, samp))

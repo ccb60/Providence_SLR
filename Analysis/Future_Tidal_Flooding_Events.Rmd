@@ -547,7 +547,10 @@ the tidal epoch as the first value, so we add four more "scenarios".
 
 ```{r mgs_means_recent}
 mgs_est_modern <- f_flood_means(epoch, theDate, MLLW,
-                                 c(0.075, 0.3048 + 0.075, 0.6096 + 0.075, 0.9144 + 0.075))
+                                 c(0.075, 
+                                   0.3048 + 0.075, 
+                                   0.6096 + 0.075, 
+                                   0.9144 + 0.075))
 mgs_est_modern
 ```
 

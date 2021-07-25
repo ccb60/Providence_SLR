@@ -1,5 +1,5 @@
 # Sources of Data
-## Sea Level Rise in providence, Maine
+## Sea Level Rise in Providence, Rhode Island
 
 <img
     src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
@@ -9,9 +9,8 @@
 Data downloaded directly from NOAA Tides and Currents (Using "Export to CSV"
 button).
 (https://tidesandcurrents.noaa.gov/sltrends/sltrends_station.shtml?id=8454000) 
-MArch 31, 2021 by Curtis C. Bohlen
+March 31, 2021 by Curtis C. Bohlen
 
-D
 **providence_tides_monthly.csv**  
 Data downloaded directly from NOAA API using a simple python script
 [(here)](providence_tide_gage_monthly.py).
